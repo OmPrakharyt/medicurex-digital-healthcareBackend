@@ -24,75 +24,70 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+
     @PostMapping("/register")
     @Operation(summary = "Register a new user")
     public ResponseEntity<?> registerUser(@RequestBody User user) {
+
+        user.setVerified(true); // auto verify
+
         User savedUser = userService.createUser(user);
-        if (savedUser == null) {
+
+        if(savedUser == null){
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "Email already registered"));
+                    .body(Map.of("error","Email already registered"));
         }
-        authService.sendOtp(user.getEmail(), "REGISTER");
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "Registration successful. Please verify OTP sent to your email."));
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of("message","Registration successful"));
     }
+
 
     @PostMapping("/send-otp")
-    @Operation(summary = "Resend OTP to email")
-    public ResponseEntity<?> sendOtp(@RequestBody Map<String, String> request) {
-        String email = request.get("email");
-        // Resend uses REGISTER context for same welcome message or generic if preferred. Using REGISTER.
-        authService.sendOtp(email, "REGISTER");
-        return ResponseEntity.ok(Map.of("message", "OTP sent successfully"));
+    public ResponseEntity<?> sendOtp(@RequestBody Map<String,String> request){
+        return ResponseEntity.ok(Map.of("message","OTP disabled"));
     }
+
 
     @PostMapping("/verify-otp")
-    @Operation(summary = "Verify email with OTP")
-    public ResponseEntity<?> verifyOtp(@RequestBody Map<String, String> request) {
-        String email = request.get("email");
-        String otp = request.get("otp");
-        if (authService.verifyOtp(email, otp)) {
-            return ResponseEntity.ok(Map.of("message", "Email verified successfully"));
-        }
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Invalid or expired OTP"));
+    public ResponseEntity<?> verifyOtp(@RequestBody Map<String,String> request){
+        return ResponseEntity.ok(Map.of("message","Verified"));
     }
+
 
     @PostMapping("/login")
-    @Operation(summary = "Login user")
-    public ResponseEntity<?> loginUser(@RequestBody Map<String, String> loginRequest) {
-        String email = loginRequest.get("email");
-        String password = loginRequest.get("password");
+    @Operation(summary="Login user")
+    public ResponseEntity<?> loginUser(
+            @RequestBody Map<String,String> loginRequest){
 
-        Optional<User> userOpt = userService.login(email, password);
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-            if (!Boolean.TRUE.equals(user.getVerified())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Your account is not verified. Please verify your email first."));
-            }
-            
-            // Generate OTP for MFA
-            authService.sendOtp(email, "LOGIN");
-            return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
-                "message", "MFA required", 
-                "mfaRequired", "true",
-                "email", email
-            ));
+        String email=loginRequest.get("email");
+        String password=loginRequest.get("password");
+
+        Optional<User> userOpt=userService.login(email,password);
+
+        if(userOpt.isPresent()){
+            return ResponseEntity.ok(userOpt.get()); // direct login no otp
         }
+
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "Invalid email or password"));
+                .body(Map.of("error","Invalid email or password"));
     }
+
 
     @PostMapping("/verify-login")
-    @Operation(summary = "Verify login with OTP for MFA")
-    public ResponseEntity<?> verifyLogin(@RequestBody Map<String, String> request) {
-        String email = request.get("email");
-        String otp = request.get("otp");
-        if (authService.verifyOtp(email, otp)) {
-            Optional<User> userOpt = userService.getUserByEmail(email);
-            if (userOpt.isPresent()) {
-                return ResponseEntity.ok(userOpt.get());
-            }
+    public ResponseEntity<?> verifyLogin(
+            @RequestBody Map<String,String> request){
+
+        String email=request.get("email");
+
+        Optional<User> userOpt=userService.getUserByEmail(email);
+
+        if(userOpt.isPresent()){
+            return ResponseEntity.ok(userOpt.get());
         }
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Invalid or expired OTP"));
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error","User not found"));
     }
+
 }
