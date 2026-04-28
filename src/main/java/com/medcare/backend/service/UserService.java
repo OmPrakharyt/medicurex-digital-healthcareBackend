@@ -33,6 +33,10 @@ public class UserService {
         return userRepository.findByEmailAndPassword(email, password);
     }
 
+    public Optional<User> getUserByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+
     public boolean deleteUser(Long id) {
         if (userRepository.existsById(id)) {
             userRepository.deleteById(id);
